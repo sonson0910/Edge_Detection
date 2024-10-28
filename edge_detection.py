@@ -11,8 +11,8 @@ class EdgeDetection:
 
     # Bước 2: Tính gradient của ảnh
     def compute_gradient(self, image):
-        grad_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=5)
-        grad_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=5)
+        grad_x = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
+        grad_y = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
         gradient_magnitude = np.sqrt(grad_x ** 2 + grad_y ** 2)
         return gradient_magnitude
 
@@ -64,6 +64,11 @@ class EdgeDetection:
         optimal_path.reverse()
         return optimal_path
 
+    # Bước 2: Phát hiện cạnh sử dụng thuật toán Canny
+    def canny_edge_detection(self, image, low_threshold, high_threshold):
+        edges = cv2.Canny(image, low_threshold, high_threshold)
+        return edges
+
     # Bước 5: Tạo đường bao khép kín
     def create_closed_contour(self, optimal_path):
         closed_contour = []
@@ -71,20 +76,34 @@ class EdgeDetection:
             closed_contour.append(point)
         return closed_contour
 
-    # Hiển thị kết quả trên giao diện
-    def display_result(self, image, closed_contour, ax):
-        ax.clear()
-        ax.imshow(image, cmap='gray')
-        xs, ys = zip(*closed_contour)  # Tách x và y
-        ax.plot(ys, xs, color='red', linewidth=2)
-        ax.axis('off')
+    # # Hiển thị kết quả trên giao diện
+    # def display_result(self, image, closed_contour, ax):
+    #     ax.clear()
+    #     ax.imshow(image, cmap='gray')
+    #     xs, ys = zip(*closed_contour)  # Tách x và y
+    #     ax.plot(ys, xs, color='red', linewidth=2)
+    #     ax.axis('off')
+
+    # Bước 3: Hiển thị kết quả
+    def display_result(self, image, edges):
+        plt.imshow(image, cmap='gray')
+        xs, ys = np.nonzero(edges)  # Lấy tọa độ của các điểm biên
+        plt.scatter(ys, xs, color='red', s=1)  # Vẽ các điểm biên lên ảnh gốc
+        plt.axis('off')
+        plt.show()
+
+    # # Hàm xử lý ảnh và hiển thị kết quả
+    # def process_image(self, path, ax):
+    #     image = self.load_image(path)
+    #     gradient = self.compute_gradient(image)
+    #     cost = self.build_cost_function(gradient)
+    #     optimal_path = self.dynamic_programming_edge_detection(cost)
+    #     closed_contour = self.create_closed_contour(optimal_path)
+    #     self.display_result(image, closed_contour, ax)
+    #     plt.show()
 
     # Hàm xử lý ảnh và hiển thị kết quả
     def process_image(self, path, ax):
         image = self.load_image(path)
-        gradient = self.compute_gradient(image)
-        cost = self.build_cost_function(gradient)
-        optimal_path = self.dynamic_programming_edge_detection(cost)
-        closed_contour = self.create_closed_contour(optimal_path)
-        self.display_result(image, closed_contour, ax)
-        plt.show()
+        optimal_path = self.canny_edge_detection(image, 100, 200)
+        self.display_result(image, optimal_path)
