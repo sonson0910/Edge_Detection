@@ -21,50 +21,72 @@ class EdgeDetection:
         cost = -gradient  # Chi phí dựa trên độ lớn gradient
         return cost
 
-    # Bước 4: Tìm đường biên tối ưu bằng quy hoạch động
+    # Áp dụng quy hoạch động để dò biên và bao trọn vật thể
     def dynamic_programming_edge_detection(self, cost):
         rows, cols = cost.shape
-        dp = np.zeros_like(cost)  # Bảng chi phí
-        path = np.zeros((rows, cols), dtype=int)  # Lưu hướng đi
+        dp = np.full_like(cost, float('inf'))  # Ma trận lưu chi phí tối thiểu
+        path = np.zeros((rows, cols, 2), dtype=int)  # Ma trận lưu hướng đi: 2 chiều để lưu tọa độ (di, dj)
+        visited = np.zeros_like(cost, dtype=bool)  # Ma trận lưu các điểm đã đi qua
 
-        # Khởi tạo bảng chi phí cho hàng đầu tiên
+        # Hướng di chuyển: lên, xuống, trái, phải, chéo trên-trái, chéo trên-phải, chéo dưới-trái, chéo dưới-phải
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+        # Khởi tạo hàng đầu tiên của ma trận DP bằng chi phí của hàng đầu tiên
         dp[0, :] = cost[0, :]
 
-        # Duyệt qua các hàng tiếp theo
+        # Duyệt qua các hàng và cột để tính chi phí tối ưu
         for i in range(1, rows):
             for j in range(cols):
-                if j == 0:
-                    min_cost = min(dp[i - 1, j], dp[i - 1, j + 1])
-                    path[i, j] = 0 if min_cost == dp[i - 1, j] else 1
-                elif j == cols - 1:
-                    min_cost = min(dp[i - 1, j - 1], dp[i - 1, j])
-                    path[i, j] = -1 if min_cost == dp[i - 1, j - 1] else 0
-                else:
-                    min_cost = min(dp[i - 1, j - 1], dp[i - 1, j], dp[i - 1, j + 1])
-                    if min_cost == dp[i - 1, j - 1]:
-                        path[i, j] = -1  # Diagonal left
-                    elif min_cost == dp[i - 1, j]:
-                        path[i, j] = 0   # Up
-                    else:
-                        path[i, j] = 1   # Diagonal right
+                min_cost = float('inf')
+                best_direction = None
+
+                # Duyệt qua các hướng di chuyển
+                for di, dj in directions:
+                    new_i, new_j = i + di, j + dj
+
+                    # Kiểm tra điểm có nằm trong ma trận không
+                    if 0 <= new_i < rows and 0 <= new_j < cols:
+                        # Tìm chi phí tối thiểu từ các hướng
+                        if dp[new_i, new_j] < min_cost:
+                            min_cost = dp[new_i, new_j]
+                            best_direction = (di, dj)
+
+                # Cập nhật bảng DP và lưu hướng đi
                 dp[i, j] = cost[i, j] + min_cost
+                if best_direction is not None:
+                    path[i, j] = best_direction
 
-        min_index = np.argmin(dp[-1, :])
-        optimal_path = [(rows - 1, min_index)]
+        # Truy ngược lại đường đi tối ưu để bao trọn thực thể
+        optimal_path = []
+        min_index = np.argmin(dp[-1, :])  # Lấy vị trí có chi phí nhỏ nhất ở hàng cuối cùng
+        optimal_path.append((rows - 1, min_index))  # Thêm điểm cuối cùng vào đường đi
+        visited[rows - 1, min_index] = True  # Đánh dấu điểm đã đi qua
 
-        for i in range(rows - 1, 0, -1):
-            direction = path[i, optimal_path[-1][1]]
-            new_index = optimal_path[-1][1] + direction
-            if new_index < 0:
-                new_index = 0
-            elif new_index >= cols:
-                new_index = cols - 1
-            optimal_path.append((i - 1, new_index))
+        current_row, current_col = rows - 1, min_index
 
-        optimal_path.reverse()
+        # Truy ngược lại cho đến khi đi hết vòng bao quanh thực thể
+        while True:
+            di, dj = path[current_row, current_col]
+            next_row = current_row + di
+            next_col = current_col + dj
+
+            # Nếu điểm tiếp theo đã được truy ngược qua (vòng hoàn tất), thì thoát
+            if visited[next_row, next_col]:
+                break
+
+            # Ưu tiên di chuyển sang trái nếu trong cùng một hàng
+            if di == 0 and dj == -1 and current_col > 0:
+                optimal_path.append((current_row, current_col - 1))
+                visited[current_row, current_col - 1] = True
+                current_col -= 1
+            else:
+                optimal_path.append((next_row, next_col))
+                visited[next_row, next_col] = True
+                current_row, current_col = next_row, next_col
+
         return optimal_path
 
-    # Bước 2: Phát hiện cạnh sử dụng thuật toán Canny
+    # Bước 4-2: Phát hiện cạnh sử dụng thuật toán Canny
     def canny_edge_detection(self, image, low_threshold, high_threshold):
         edges = cv2.Canny(image, low_threshold, high_threshold)
         return edges
@@ -84,7 +106,7 @@ class EdgeDetection:
     #     ax.plot(ys, xs, color='red', linewidth=2)
     #     ax.axis('off')
 
-    # Bước 3: Hiển thị kết quả
+    # # Bước 6: Hiển thị kết quả
     def display_result(self, image, edges):
         plt.imshow(image, cmap='gray')
         xs, ys = np.nonzero(edges)  # Lấy tọa độ của các điểm biên
