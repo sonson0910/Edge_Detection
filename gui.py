@@ -1,5 +1,5 @@
 from tkinter import Tk, filedialog, Label, Button
-from edge_detection import EdgeDetection
+from edge_detection1 import EdgeDetection
 import matplotlib.pyplot as plt
 
 class ImageApp:

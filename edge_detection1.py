@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from collections import deque
 import matplotlib.pyplot as plt
 
 
@@ -28,44 +27,58 @@ class EdgeDetection:
         # Hướng di chuyển: lên, xuống, trái, phải, chéo trên-trái, chéo trên-phải, chéo dưới-trái, chéo dưới-phải
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
 
-        # Khởi tạo hàng đợi với các điểm của hàng đầu tiên, giữ nguyên chi phí của hàng đầu tiên
-        queue = deque([(0, j) for j in range(cols)])
+        # Khởi tạo hàng đầu tiên của ma trận DP bằng chi phí của hàng đầu tiên
         dp[0, :] = cost[0, :]
 
-        # Sử dụng hàng đợi để duyệt qua toàn bộ thực thể
-        while queue:
-            i, j = queue.popleft()
+        # Duyệt qua các hàng và cột để tính chi phí tối ưu
+        for i in range(1, rows):
+            for j in range(cols):
+                min_cost = float('inf')
+                best_direction = None
 
-            for di, dj in directions:
-                new_i, new_j = i + di, j + dj
+                # Duyệt qua các hướng di chuyển
+                for di, dj in directions:
+                    new_i, new_j = i + di, j + dj
 
-                # Kiểm tra điểm có nằm trong ma trận và chưa được duyệt qua
-                if 0 <= new_i < rows and 0 <= new_j < cols and not visited[new_i, new_j]:
-                    # Tính chi phí mới nếu đi đến điểm (new_i, new_j)
-                    new_cost = dp[i, j] + cost[new_i, new_j]
-                    
-                    # Cập nhật nếu tìm thấy chi phí nhỏ hơn cho điểm (new_i, new_j)
-                    if new_cost < dp[new_i, new_j]:
-                        dp[new_i, new_j] = new_cost
-                        path[new_i, new_j] = (di, dj)  # Lưu hướng di chuyển
-                        queue.append((new_i, new_j))  # Đưa điểm vào hàng đợi
+                    # Kiểm tra điểm có nằm trong ma trận không
+                    if 0 <= new_i < rows and 0 <= new_j < cols:
+                        # Tìm chi phí tối thiểu từ các hướng
+                        if dp[new_i, new_j] < min_cost:
+                            min_cost = dp[new_i, new_j]
+                            best_direction = (di, dj)
 
-            # Đánh dấu điểm (i, j) đã được duyệt
-            visited[i, j] = True
+                # Cập nhật bảng DP và lưu hướng đi
+                dp[i, j] = cost[i, j] + min_cost
+                if best_direction is not None:
+                    path[i, j] = best_direction
 
         # Truy ngược lại đường đi tối ưu để bao trọn thực thể
         optimal_path = []
-        min_index = np.argmin(dp[-1, :])  # Tìm vị trí có chi phí nhỏ nhất ở hàng cuối cùng
-        current_row, current_col = rows - 1, min_index
-        optimal_path.append((current_row, current_col))
-        visited[current_row, current_col] = True
+        min_index = np.argmin(dp[-1, :])  # Lấy vị trí có chi phí nhỏ nhất ở hàng cuối cùng
+        optimal_path.append((rows - 1, min_index))  # Thêm điểm cuối cùng vào đường đi
+        visited[rows - 1, min_index] = True  # Đánh dấu điểm đã đi qua
 
-        # Truy ngược lại cho đến khi quay về điểm bắt đầu
-        while (current_row, current_col) != (0, min_index):
+        current_row, current_col = rows - 1, min_index
+
+        # Truy ngược lại cho đến khi đi hết vòng bao quanh thực thể
+        while True:
             di, dj = path[current_row, current_col]
-            current_row, current_col = current_row - di, current_col - dj
-            optimal_path.append((current_row, current_col))
-            visited[current_row, current_col] = True
+            next_row = current_row + di
+            next_col = current_col + dj
+
+            # Nếu điểm tiếp theo đã được truy ngược qua (vòng hoàn tất), thì thoát
+            if visited[next_row, next_col]:
+                break
+
+            # Ưu tiên di chuyển sang trái nếu trong cùng một hàng
+            if di == 0 and dj == -1 and current_col > 0:
+                optimal_path.append((current_row, current_col - 1))
+                visited[current_row, current_col - 1] = True
+                current_col -= 1
+            else:
+                optimal_path.append((next_row, next_col))
+                visited[next_row, next_col] = True
+                current_row, current_col = next_row, next_col
 
         return optimal_path
 
